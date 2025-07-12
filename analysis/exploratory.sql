@@ -63,14 +63,118 @@ select
     ,avg(b.TotalRevenue) as AvgTotRev
 from bookings as b
 group by b.Destination, b.LaunchLocation
---order by b.Destination -- destinations generally associated with one launch loc
-order by b.LaunchLocation
+order by b.Destination -- destinations generally associated with one launch loc
+-- order by b.LaunchLocation
 --order by AvgDestRev desc -- mars still highest rev over all
 -- frequent dest + launch loc combos are the cheapest options
 -- little to no variation in dest rev except for the most common dest + launch locs
+-- but surprised there is variation w/i Dest x LaunchLoc. What's the other var that influences this? 
+
+select 
+    b.Destination
+    ,b.LaunchLocation
+    -- ,ah.CommunicationMethod
+    ,ah.LeadSource
+    ,count(b.Destination) as NumBookings
+    ,min(b.DestinationRevenue) as MinDestRev
+    ,avg(b.DestinationRevenue) as AvgDestRev
+    ,max(b.DestinationRevenue) as MaxDestRev
+    ,avg(b.PackageRevenue) as AvgPackageRev
+    ,avg(b.TotalRevenue) as AvgTotRev
+from bookings as b
+join assignment_history ah
+    on ah.AssignmentID = b.AssignmentID
+group by 
+    b.Destination, b.LaunchLocation
+    -- ,ah.CommunicationMethod
+    ,ah.LeadSource
+--order by b.Destination -- destinations generally associated with one launch loc
+order by b.LaunchLocation
+
+select *
+from bookings b
+join assignment_history ah
+    on ah.AssignmentID = b.AssignmentID
+join space_travel_agents sta
+    on sta.AgentID = ah.AgentID
+where 
+    b.Destination in ('Europa')
+    and b.LaunchLocation in ('Dubai Interplanetary Hub')
+-- some variation in DestRev d/t Package for Europa
+
+select *
+from bookings b
+join assignment_history ah
+    on ah.AssignmentID = b.AssignmentID
+join space_travel_agents sta
+    on sta.AgentID = ah.AgentID
+where 
+    b.Destination in ('Mars')
+    and b.LaunchLocation in ('Dallas-Fort Worth Launch Complex')
+order by DestinationRevenue
+-- there's no clear reason why 4 Dest x LaunchLoc here have <$150k DestRev
+-- Maybe a sale etc. Going to assume whatever it is is outside of the agents control
+
+select cast(getdate() as date)
+
+select 
+    cast(ah.AssignedDateTime as date) as AssignmentDate
+    ,count(*) as NumAssignments
+    ,sum(iif(b.BookingStatus = 'Confirmed', 1, 0)) as NumConfirmed
+    ,sum(iif(b.BookingStatus = 'Cancelled', 1, 0)) as NumCancelled
+    ,avg(b.TotalRevenue) as AvgTotRev
+    ,sum(iif(b.BookingID is NULL, 1, 0)) as NumNullBookings
+from assignment_history ah
+left join bookings b
+    on ah.AssignmentID = b.AssignmentID
+group by cast(ah.AssignedDateTime as date)
+-- 2081-02-20 with 44 assignments
+-- rest with ~5-7 and ~1 assignment without a booking
+-- wonder if some agents / agent characteristics are more likely to not convert an assignment into a booking? 
 
 --select * from bookings as b where b.DestinationRevenue + b.PackageRevenue != b.TotalRevenue
 -- confirm dest + package = tot rev
+
+select datename(dw, getdate())
+
+select 
+    datepart(dw, cast(ah.AssignedDateTime as date)) as AssignmentWeekdayNum
+    ,datename(dw, cast(ah.AssignedDateTime as date)) as AssignmentWeekday
+    ,count(*) as NumAssignments
+    ,sum(iif(b.BookingStatus = 'Confirmed', 1, 0)) as NumConfirmed
+    ,sum(iif(b.BookingStatus = 'Cancelled', 1, 0)) as NumCancelled
+    ,avg(b.TotalRevenue) as AvgTotRev
+    ,sum(iif(b.BookingID is NULL, 1, 0)) as NumNullBookings
+from assignment_history ah
+left join bookings b
+    on ah.AssignmentID = b.AssignmentID
+group by datepart(dw, cast(ah.AssignedDateTime as date))
+order by 1
+-- about 60 assignments / weekday. Except thurs probs b/c 02-20 is a thursday
+
+select 
+    'Max' as Stat
+    ,max(DestinationRevenue) as DestinationRevenue
+    ,max(PackageRevenue) as PackageRevenue
+    ,max(TotalRevenue) as TotalRevenue
+from bookings
+union
+select 
+    'Average' as Stat
+    ,avg(DestinationRevenue) as DestinationRevenue
+    ,avg(PackageRevenue) as PackageRevenue
+    ,avg(TotalRevenue) as TotalRevenue
+from bookings
+UNION
+select 
+    'Min' Stat
+    ,min(DestinationRevenue) as DestinationRevenue
+    ,min(PackageRevenue) as PackageRevenue
+    ,min(TotalRevenue) as TotalRevenue
+from bookings
+-- * Destination avg is $130k with $50k/150k min/max
+-- * Package avg is $24k with 0/30 min/max
+-- * Total avg 155 with 65/180 min/max
 
 -- package rev
 select 
@@ -85,7 +189,7 @@ where b.BookingStatus != 'Pending'
 group by b.Package
 order by AvgPackageRev desc
 -- some packages have $0 for rev
--- cloud city most expensive, 
+-- luxury dome most expensive. It's the mars package so makes sense
 
 select top 10 * from bookings
 select top 10 * from assignment_history
@@ -104,6 +208,19 @@ select
 from bookings as b
 group by b.Destination, b.LaunchLocation, b.Package
 order by AvgPackageRev
+
+-- Destination by Package
+select 
+    b.Destination, b.Package
+    ,count(*) as NumBookings
+    ,avg(b.DestinationRevenue) as AvgDestRev
+from bookings b
+where b.BookingStatus != 'Pending'
+group by b.Destination, b.Package
+order by b.Destination
+-- only 1 package per dest
+-- NOTE: packages seem determined by destination
+-- WITH EXCEPTION of Europa & Glacier Trek / 0-Gravity which have similar avg DestRev
 
 
 -- **************************** assignments ****************************
@@ -144,6 +261,10 @@ select distinct sta.JobTitle from space_travel_agents sta
 -- space travel agent, lead, senior
 select distinct sta.DepartmentName from space_travel_agents sta
 -- Interplanetary Sales, Luxury Voyages, Premium Bookings
+select distinct sta.ManagerName from space_travel_agents sta
+-- Lyra Chen, Zane Holloway
+select * from space_travel_agents where FirstName in ('Lyra', 'Zane')
+-- no managers are agents
 select count(*) as NumAgents from space_travel_agents sta group by sta.YearsOfService
 -- wide dispersion of experience
 
@@ -190,7 +311,7 @@ from (
 join space_travel_agents sta
     on sta.AgentID = x.AgentID
 group by x.AgentID, sta.YearsOfService, sta.AverageCustomerServiceRating
--- order by ConfirmationRate desc
+order by ConfirmationRate desc
 -- order by AvgActualPackageRevenue desc
 
 -- similar numbers of bookings
@@ -253,6 +374,11 @@ select
 from #AgentXLoc axl
 group by axl.LaunchLocation
 -- London & Sydney covered by 6, 1 but almost all agents cover all Locs otherwise
+select b.LaunchLocation, count(*) as NumBookings
+from bookings b
+where b.BookingStatus != 'Canceled'
+group by b.LaunchLocation
+-- but London, Sydney only have 7, 1 launches
 
 
 
@@ -271,6 +397,8 @@ select
     ,ah.CustomerName, ah.CommunicationMethod, ah.LeadSource, b.Destination, b.LaunchLocation
     -- vars we know about agent
     ,sta.JobTitle, sta.DepartmentName, sta.ManagerName, sta.YearsOfService, sta.AverageCustomerServiceRating
+    -- other rev values
+    ,b.DestinationRevenue, b.TotalRevenue
 into #temptbl
 from bookings b
 left join assignment_history ah
@@ -278,6 +406,7 @@ left join assignment_history ah
 left join space_travel_agents sta
     on sta.AgentID = ah.AgentID
 where b.BookingStatus != 'Pending'
+SELECT * from #temptbl
 
 select 
     tt.AgentId
