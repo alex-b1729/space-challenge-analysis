@@ -1,5 +1,5 @@
 select
-    b.BookingID, ah.AssignmentID, sta.AgentID
+    ah.AssignmentID, b.BookingID, sta.AgentID
     -- dependent var
     ,b.PackageRevenue
     ,b.BookingStatus
@@ -11,9 +11,10 @@ select
     ,ah.AssignedDateTime, b.BookingCompleteDate, b.CancelledDate
     -- other rev values
     ,b.DestinationRevenue, b.TotalRevenue
-from bookings b
-left join assignment_history ah
+from assignment_history ah
+left join bookings b
     on ah.AssignmentID = b.AssignmentID
 left join space_travel_agents sta
     on sta.AgentID = ah.AgentID
-where b.BookingStatus != 'Pending'
+order by ah.AssignmentID
+-- where b.BookingStatus != 'Pending' or b.BookingStatus is NULL
