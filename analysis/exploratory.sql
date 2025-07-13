@@ -23,6 +23,20 @@ select distinct b.LaunchLocation as UniqueCol from bookings as b
 -- New York Orbital Gateway
 -- Sydney Stellar Port
 -- Tokyo Spaceport Terminal
+select distinct b.PackageRevenue from bookings b
+-- range(0, 35000, 5000)
+
+select 
+    b.PackageRevenue
+    ,count(*) as NumBookings
+    ,avg(DestinationRevenue) as AvgDestRev
+    ,case 
+        when b.PackageRevenue != 0 then avg(DestinationRevenue) / b.PackageRevenue 
+        else -1.0 
+        end as Ratio
+from bookings b
+where b.BookingStatus = 'Confirmed'
+group by b.PackageRevenue
 
 -- booking status stats
 select 
@@ -252,6 +266,27 @@ from (
 ) x
 group by x.TimesAsCustomer
 -- 10 repeat customers
+
+-- how long from assignment to booking closure?
+select
+    avg(
+        cast(datediff(d, ah.AssignedDateTime, coalesce(b.BookingCompleteDate, b.CancelledDate)) as float)
+    ) as AvgDaysToBookingCompletion
+    ,max(
+        datediff(d, ah.AssignedDateTime, coalesce(b.BookingCompleteDate, b.CancelledDate))
+    ) as MaxDaysToBookingCompletion
+    ,avg(
+        cast(datediff(hh, ah.AssignedDateTime, coalesce(b.BookingCompleteDate, b.CancelledDate)) as float)
+    ) as AvgHoursToBookingCompletion
+from bookings b
+join assignment_history ah
+    on ah.AssignmentID = b.AssignmentID
+where b.BookingStatus != 'Pending'
+-- conditional on there being a non pending booking linked to an assignment
+-- the max days between AssignmentDateTime to BookingCompleteDate or CancelledDate is 1
+-- Average is 0.015 days or 0.56 hours
+-- I'd feel safe assuming that any assignment that's >1 day old that doesn't have
+-- a related booking is a stale customer lead that won't convert
 
 
 
