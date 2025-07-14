@@ -473,3 +473,119 @@ order by NumTimesObserved desc
 -- only 53 unique combos
 -- 13 combos are all observed 10+ times
 -- 5 combos are observed 25+ times with 2 obs of 40
+
+-- what about excluding LaunchLocation since basically always determined by Destination?
+select 
+    count(*) as NumTimesObserved
+    ,ah.CommunicationMethod, ah.LeadSource, b.Destination 
+from bookings b
+left join assignment_history ah
+    on ah.AssignmentID = b.AssignmentID
+where b.BookingStatus != 'Pending'
+group by ah.CommunicationMethod, ah.LeadSource, b.Destination
+order by NumTimesObserved desc
+-- only 19 combinations in the data of ah.CommunicationMethod, ah.LeadSource, b.Destination 
+
+-- Within a CMxLSxD bucket, are some agetns reliably (statistically) better than others? 
+select 
+    ah.AgentID, sta.AverageCustomerServiceRating as AvgRating
+    ,b.Destination, ah.LeadSource, ah.CommunicationMethod
+    ,count(*) as NumObs
+    ,sum(iif(b.BookingStatus = 'Confirmed', b.PackageRevenue, 0.0)) as SumRealizedRev
+    ,avg(iif(b.BookingStatus = 'Confirmed', b.PackageRevenue, 0.0)) as AvgRealizedRev
+    ,avg(iif(b.BookingStatus = 'Confirmed', 1.0, 0.0)) as ConfirmedPercent
+    ,string_agg(cast(b.BookingID as varchar), ', ') as BookingIDs
+from bookings b
+left join assignment_history ah
+    on ah.AssignmentID = b.AssignmentID
+left join space_travel_agents sta
+    on sta.AgentID = ah.AgentID
+where 
+    b.BookingStatus != 'Pending'
+    -- and (b.Destination = 'Mars' and ah.LeadSource = 'Organic' and ah.CommunicationMethod = 'Text')
+group by ah.AgentID, sta.AverageCustomerServiceRating, ah.CommunicationMethod, ah.LeadSource, b.Destination
+order by 
+    b.Destination
+    ,ah.LeadSource
+    ,ah.CommunicationMethod
+    ,AvgRealizedRev desc
+    -- ,SumRealizedRev desc
+    ,sta.AverageCustomerServiceRating desc
+-- I suspect the lead source is much more important to the E[rev] and cancelation likelyhood 
+-- than the communication method
+-- but maybe not? 
+-- For (Europa, Bought) agent 6 on the Phone has has a 100% confirmed rate with 3 bookings and 65k total rev
+-- But agent 6 with text has a 25% confirmed rate with 4 bookings
+-- select * from bookings where BookingID in (4, 53, 243)
+
+
+
+SELECT
+    rank() over(
+        partition by Destination, LeadSource, CommunicationMethod
+        order by SumRealizedRev desc, AvgRating desc
+        ) as rating
+        ,x.*
+from (
+    select 
+        ah.AgentID
+        ,b.Destination, ah.LeadSource, ah.CommunicationMethod
+        ,count(*) as NumObs
+        ,sum(iif(b.BookingStatus = 'Confirmed', b.PackageRevenue, 0.0)) as SumRealizedRev
+        ,avg(iif(b.BookingStatus = 'Confirmed', b.PackageRevenue, 0.0)) as AvgRealizedRev
+        ,avg(iif(b.BookingStatus = 'Confirmed', 1.0, 0.0)) as ConfirmedPercent
+        ,sta.AverageCustomerServiceRating as AvgRating
+        ,string_agg(cast(b.BookingID as varchar), ', ') as BookingIDs
+    from bookings b
+    left join assignment_history ah
+        on ah.AssignmentID = b.AssignmentID
+    left join space_travel_agents sta
+        on sta.AgentID = ah.AgentID
+    where 
+        b.BookingStatus != 'Pending'
+        -- and (b.Destination = 'Mars' and ah.LeadSource = 'Organic' and ah.CommunicationMethod = 'Text')
+    group by ah.AgentID, sta.AverageCustomerServiceRating, ah.CommunicationMethod, ah.LeadSource, b.Destination
+) as x
+order by 
+    Destination
+    ,LeadSource
+    ,CommunicationMethod
+    -- ,AvgRealizedRev desc
+    ,SumRealizedRev desc
+    ,AvgRating desc
+
+
+-- exluding LeadSource
+SELECT
+    rank() over(
+        partition by Destination, CommunicationMethod
+        order by SumRealizedRev desc, AvgRating desc
+        ) as rating
+        ,x.*
+from (
+    select 
+        ah.AgentID
+        ,b.Destination, ah.CommunicationMethod
+        ,count(*) as NumObs
+        ,sum(iif(b.BookingStatus = 'Confirmed', b.PackageRevenue, 0.0)) as SumRealizedRev
+        ,avg(iif(b.BookingStatus = 'Confirmed', b.PackageRevenue, 0.0)) as AvgRealizedRev
+        ,avg(iif(b.BookingStatus = 'Confirmed', 1.0, 0.0)) as ConfirmedPercent
+        ,sta.AverageCustomerServiceRating as AvgRating
+        ,string_agg(cast(b.BookingID as varchar), ', ') as BookingIDs
+    from bookings b
+    left join assignment_history ah
+        on ah.AssignmentID = b.AssignmentID
+    left join space_travel_agents sta
+        on sta.AgentID = ah.AgentID
+    where 
+        b.BookingStatus != 'Pending'
+        -- and (b.Destination = 'Mars' and ah.LeadSource = 'Organic' and ah.CommunicationMethod = 'Text')
+    group by ah.AgentID, sta.AverageCustomerServiceRating, ah.CommunicationMethod, b.Destination
+) as x
+order by 
+    Destination
+    ,CommunicationMethod
+    -- ,AvgRealizedRev desc
+    ,SumRealizedRev desc
+    ,AvgRating desc
+
