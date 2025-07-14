@@ -18,6 +18,7 @@ Unoredered things worth noting:
     * Destination avg is $130k with $50k/150k min/max
     * Package avg is $24k with 0/30 min/max
     * Total avg 155 with 65/180 min/max
+* There's a max of 1 day between `AssignedDateTime` and `coalesce(BookingCompleteDate, CancelledDate)`. The average is ~0.5 hours. (Conditional on there being a non-pending booking relation to a given assignment.) 
 
 ## Brainstorming
 ### Dependent variable
