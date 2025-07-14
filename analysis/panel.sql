@@ -7,7 +7,7 @@ drop table if exists #PanelTbl
 SELECT
     rank() over(
         partition by Destination, LeadSource, CommunicationMethod
-        order by AvgRealizedRev desc, AvgRating desc
+        order by AvgRealizedRev desc, AvgRating desc, LastAssignedDateTime desc
         ) as GroupRank
         ,x.*
 into #ObservationTbl
@@ -20,6 +20,7 @@ from (
         ,avg(iif(b.BookingStatus = 'Confirmed', b.PackageRevenue, 0.0)) as AvgRealizedRev
         ,avg(iif(b.BookingStatus = 'Confirmed', 1.0, 0.0)) as ConfirmedPercent
         ,sta.AverageCustomerServiceRating as AvgRating
+        ,max(ah.AssignedDateTime) as LastAssignedDateTime
         ,string_agg(cast(b.BookingID as varchar), ', ') as BookingIDs
     from bookings b
     left join assignment_history ah
@@ -28,7 +29,7 @@ from (
         on sta.AgentID = ah.AgentID
     where 
         b.BookingStatus != 'Pending'
-        -- and (b.Destination = 'Mars' and ah.LeadSource = 'Organic' and ah.CommunicationMethod = 'Text')
+        --and (b.Destination = 'Mars') --and ah.LeadSource = 'Organic' and ah.CommunicationMethod = 'Text')
     group by ah.AgentID, sta.AverageCustomerServiceRating, ah.CommunicationMethod, ah.LeadSource, b.Destination
 ) as x
 order by 
@@ -38,6 +39,7 @@ order by
     ,AvgRealizedRev desc  -- accounts for cancelation rate, not just upsell ability
     -- ,SumRealizedRev desc
     ,AvgRating desc
+    ,LastAssignedDateTime desc
 
 -- select all possible Destination, LeadSource, CommunicationMethod combinations
 select 
@@ -60,7 +62,8 @@ select
     obs.GroupRank, obs.AgentID
     ,idx.Destination, idx.LeadSource, idx.CommunicationMethod
     ,obs.NumObs, obs.SumRealizedRev, obs.AvgRealizedRev
-    ,obs.ConfirmedPercent, obs.AvgRating, obs.BookingIDs
+    ,obs.ConfirmedPercent, obs.AvgRating, LastAssignedDateTime
+    ,obs.BookingIDs
 into #PanelTbl
 from #PanelIndexTbl idx
 left join #ObservationTbl obs
@@ -68,10 +71,19 @@ left join #ObservationTbl obs
     and obs.LeadSource = idx.LeadSource
     and obs.CommunicationMethod = idx.CommunicationMethod
 -- order by obs.GroupRank, idx.Destination, idx.LeadSource, idx.CommunicationMethod
-select * from #PanelTbl order by GroupRank, Destination, LeadSource, CommunicationMethod
+
+select * 
+from #PanelTbl 
+where 
+    Destination = 'Europa'
+    and LeadSource = 'Organic'
+    and CommunicationMethod = 'Phone Call'
+order by Destination, LeadSource, CommunicationMethod, GroupRank
 
 select 
-    AgentID
-    ,count()
-from #PanelTbl 
-group by AgentID
+    count(*) as NumAgentsWithExperience
+    ,max(NumObs) as MaxAgentExperienceObs
+    ,Destination, LeadSource, CommunicationMethod
+from #PanelTbl
+group by Destination, LeadSource, CommunicationMethod
+order by 1 desc

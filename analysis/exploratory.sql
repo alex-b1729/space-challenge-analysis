@@ -502,7 +502,7 @@ left join space_travel_agents sta
     on sta.AgentID = ah.AgentID
 where 
     b.BookingStatus != 'Pending'
-    -- and (b.Destination = 'Mars' and ah.LeadSource = 'Organic' and ah.CommunicationMethod = 'Text')
+    and (b.Destination = 'Mars' and ah.LeadSource = 'Organic' and ah.CommunicationMethod = 'Phone Call')
 group by ah.AgentID, sta.AverageCustomerServiceRating, ah.CommunicationMethod, ah.LeadSource, b.Destination
 order by 
     b.Destination
