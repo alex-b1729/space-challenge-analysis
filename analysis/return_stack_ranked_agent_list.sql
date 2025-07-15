@@ -186,6 +186,18 @@ begin
         end
     end
 
+    if @ShowDetailedOutput = 1
+        select 
+            rank() over(
+                order by 
+                    AvgRealizedPackageRevenue desc
+                    ,NumObs desc
+                    ,AverageCustomerServiceRating desc
+                    ,LastAssignedDateTime desc
+                ) as AssignmentRank
+                ,act.*
+        from #AgentChoiceTbl act
+
     select 
         rank() over(
             order by 
@@ -200,8 +212,9 @@ end
 go 
 
 exec ReturnStackRankedAgentList 
-    @CustomerName=N'Evelyn Brooks',
-    @CommunicationMethod='Text',
-    @LeadSource=N'Organic',
-    @Destination=N'Venus',
-    @LaunchLocation=N'Luxury Dome Stay'
+    @CustomerName=N'Evelyn Brooks'
+    ,@CommunicationMethod='Text'
+    ,@LeadSource=N'Organic'
+    ,@Destination=N'Venus'
+    ,@LaunchLocation=N'Luxury Dome Stay'
+    -- ,@ShowDetailedOutput = 1
