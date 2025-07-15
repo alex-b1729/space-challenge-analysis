@@ -12,7 +12,7 @@
 ## Analysis
 
 ### Stack ranking procedure
-The file `analysis/return_stack_ranked_agent_list.sql` defines a stored procedure, `ReturnStackRankedAgentList`, which returns a stack ranked list of `AgentID`s ordered by `AssignmentRank`.
+The file [analysis/return_stack_ranked_agent_list.sql](analysis/return_stack_ranked_agent_list.sql) defines a stored procedure, `ReturnStackRankedAgentList`, which returns a stack ranked list of `AgentID`s ordered by `AssignmentRank`.
 The stored procedure takes 5 required parameters and 1 optional parameter. 
 ```sql
 @CustomerName varchar(100)
@@ -22,21 +22,23 @@ The stored procedure takes 5 required parameters and 1 optional parameter.
 @LaunchLocation varchar(100)
 @ShowDetailedOutput bit = 0
 ```
-The required parameters are the [details known at time of assignment](#known-details) and the optional parameter, `@ShowDetailedOutput`, returns an additional table with the columns used in calculating the stack ranking. 
+The required parameters are the details known at time of assignment and the optional parameter, `@ShowDetailedOutput`, returns an additional table with the columns used in calculating the stack ranking. 
 
 ### Algorithm Overview
 I consider agents responsible for two variables: 
 1. `PackageRevenue`
-2. `BookingStatus`,  
+2. `BookingStatus`
+
 While agents do not have complete control over these variables, more skilled agents should perform better on these metrics than less skilled agents. 
 
 I capture both of these variables with the constructed variable:
 
->  `RealizedPackageRevenue` := `PackagedRevenue` if `BookingStatus='Confirmed'` otherwise `0`. 
+`RealizedPackageRevenue` := `PackagedRevenue` if `BookingStatus='Confirmed'` otherwise `0`. 
 
 Taking the average of an agents `RealizedPackageRevenue` gives a sense of how that agent's historical performance has impacted `TotalRevenue` and the bottom line. 
 `RealizedPackageRevenue` may be higher for an agent with a high cancelation rate if the assignments that the agent does convert have high enough upsell packages.
 Likewise, an agent who does not upsell as aggressively, but has a lower cancelation rate, may also have a higher `RealizedPackageRevenue`. 
+Both of these are skilled agents to whom I would like to assign leads. 
 
 I match incoming assignments to agents by ranking their `RealizedPackageRevenue` on previous assignments with the same combination of (in order of priority):
 
@@ -49,13 +51,13 @@ If there are fewer than 10 agents in that set (Ganymede, for example), I match o
 Unrecognized destinations for which there is no history are assigned to the agent with the historically highest `RealizedPackageRevenue`. 
 
 As a tie breaker, I then order agents by 
-* The descending number of times they have previously appeard in that situation, `NumObs`
+* The descending number of times they have previously been assigned that combination of `Destination`, `LeadSource`, `CommunicationMethod`
 * Their `AverageCustomerServiceRating` descending
 * Their most recent date and time they fielded an assignment with this situation, `LastAssignedDateTime`
 
 ### Things I ignore for my algorithm
 * Pending bookings or agent assignments for which there is not a related booking. 
-* `LaunchLocation` since it is highly correlated with `Destination`, without more context, I assume that agents are better suited to upsell destination features.
+* `LaunchLocation` since it is highly correlated with `Destination`. Without more context, I assume that agents are better suited to upsell destination features.
 * `BookingRevenue` since, in this dataset, it is almost entirely determined by `Destination` and `LaunchLocation`. 
 * `TotalRevenue` since it is simply the sum of `PackageRevenue` and `TotalRevenue`. 
 
@@ -70,21 +72,21 @@ Although there is clearly variation between the agents' averages, few of them ar
 Furthermore the few statistical relationships that are there almost certainly would not survive the necessary adjustment for [multiple hypothesis testing](https://en.wikipedia.org/wiki/Multiple_comparisons_problem). 
 
 This same lack of statistical significance appears in all of the other relationship [which I tested](analysis/exploratory.ipynb).
-There is no difference between agent's `PackageRevenue` by `DepartmentName`, `JobTitle`, `YearsOfService`, `AverageCustomerServiceRating`, `LeadSource`, or `CommunicationMethod`.  
+There is no difference between agent's `PackageRevenue` by `DepartmentName`, `JobTitle`, `YearsOfService`, `AverageCustomerServiceRating`, `LeadSource`, or `CommunicationMethod`. 
 No difference in department or job title `PackageRevenue` by `Destination`. 
 No difference in cancelation rates across a host of database variables. 
 
 ![Average PackageRevenue with 90% confidence interval bars](./assets/avg_PackageRevenue_by_DepartmentName.png)
 
 I tested if agents with more bookings for a destination had higher revenue for that location by regressing an agent's average confirmed revenue (independent variable) against the number of times that agent has booked that location. 
-Unfortunately, no statistical relation. 
+Unfortunately, no statistical relationship. 
 
 ![Agent location booking count plotted against their average PackageRevenue at that location](./assets/agent_num_bookings_vs_avg_PackageRevenue_by_destination.png)
 
 Similar regressions of other variables also yielded no results. 
 
 ### Recommendations
-I recommend Astra use the my algorithm for the next few quaters. 
+I recommend Astra use my algorithm for the next few quaters. 
 At the current average rate of around 6 bookings per day we will have about 800 additional observations after six months which should be enough to find more robust statistical trends. 
 
 ## Instructions
@@ -100,7 +102,6 @@ The Enterprise Intelligence Department at Astra Luxury Travel is the organizatio
 
 Your team must develop a real-time SQL assignment algorithm that automatically matches prospective customers with the best travel agent available. Agents not only guide customers through the booking process but also upsell luxury packages, exclusive excursions, and custom accommodations. At the end of each journey, customers rate their experience with their travel agent. Your solution should receive details about a customer (listed below) and return a stack-ranked list of travel agents ordered from best to worst. 
 
-<span id="#known-details"></span>
 Details known at time of assignment: 
 - Customer Name
 - Communication Method
